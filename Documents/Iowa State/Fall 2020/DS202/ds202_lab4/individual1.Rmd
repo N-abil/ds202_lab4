@@ -1,0 +1,209 @@
+---
+title: "Lab 4"
+author: "Muhammad Idris"
+date: "10/11/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Loading Data
+
+```{r}
+library(tidyverse)
+library(readxl)
+
+defense <- read_excel("cyclonesFootball2019.xlsx", sheet= 'Defensive')
+str(defense)
+
+offense <- read_excel('cyclonesFootball2019.xlsx', sheet= 'Offensive')
+str(offense)
+
+biography <- read_excel('cyclonesFootball2019.xlsx', sheet= 'Biography')
+str(biography)
+
+
+```
+
+##Part one: Cleaning data
+
+1.The player names and opponent names are factors.  
+
+```{r}
+library(tidyverse)
+
+defense$Name <- as.factor(defense$Name)
+defense$Opponent_Opponent <- as.factor(defense$Opponent_Opponent)
+offense$Name <- as.factor(offense$Name)
+offense$Opponent_Opponent <- as.factor(offense$Opponent_Opponent)
+biography$Name <- as.factor(biography$Name)  
+```  
+
+2. All offensive and defensive statistics are numerical. The Weight column in biogrpahy is also numeric.Change the Height column in biogrpahy into numeric. 
+
+```{r}
+defClean <- defense %>% mutate_at(c("Tackles_Solo","Tackles_ASST", "Tackles_TFL","Tackles_Sack","Turnover_FF","Turnover_FR","Turnover_INT","Pass_QBH","Pass_PB"),as.numeric)
+
+offClean <- offense %>% replace_na(list(.=0)) %>% mutate_if(is.character,list(~replace_na(.,0))) %>% mutate_at(c("Rushing_ATT","Rushing_YDS", "Rushing_TD","Receiving_REC","Receiving_YDS","Receiving_TD","Passing_YDS","Receiving_TD","Passing_CMP-ATT","Passing_YDS","Passing_TD","Passing_INT"),as.numeric)
+
+bioClean <- biography %>% separate(col = Height,into = c("Feet", "Inches"), sep = "-") %>% mutate(Weight = as.numeric(Weight)) %>% mutate(Feet = as.numeric(Feet),Inches = as.numeric(Inches)) %>% mutate(Height = Feet * 12 + Inches) %>% select (-Feet , -Inches)
+
+str(defClean)
+str(offClean)
+str(bioClean)  
+```
+
+#Part two: Tidying  
+
+1.Reformat the defClean data frame into a tidy format using pivot_longer. The type of statistic (Tackles_Solo, Tackles_ASST, etc) is added as a new key column named stat.  
+
+```{r}
+defClean2 <- defClean %>% pivot_longer(Tackles_Solo:Pass_PB, names_to = 'stat', values_to = 'count')
+
+head(defClean2)
+```  
+
+2.Compare the distributions of the defensive statistics. What defensive skills are rare?
+
+```{r}
+ggplot(defClean2, aes(x = count)) + geom_bar() + facet_wrap(~stat) + labs(title = "Distributions of the Defensive Statistics")
+```  
+
+Turnovers are rare defensive skills with high count value of 0.Tackles for loss and sacks also appear to be rare.
+
+3.Did ISU have better defense against Iowa or Notre Dame? Answer this question by creating a scatterplot with x- and y-axes being the number of solo tackles (of each player). A large number of solo tackles is an indicator of good defense.  
+
+```{r}
+betterDef <- defClean2 %>% pivot_wider(names_from = Opponent_Opponent, values_from = count) %>% filter(stat == 'Tackles_Solo') %>% select(c('Iowa' ,'Notre Dame', stat)) 
+
+ggplot(betterDef, aes(x = Iowa, 'Notre Dame')) + geom_point(position = 'jitter') + labs(x = 'Defense againts Iowa', y = 'Defense against Notre Dame', title = 'ISU defense against Iowa vs Notre Dame by solo tackles')
+```
+
+From the scatter plot, ISU had better defense against Iowa than Notre Dame. There are a few players that managed to get higher solo tackles againts Iowa than Notre Dame.
+
+4. Separate the Hometown column into two columns, namely the city and the state. Print the first few rows of these two columns. (Hint: look at the sep= argument of separate)  
+
+```{r}
+bioClean1 <- bioClean %>% separate(Hometown, c('city', 'state'), sep = ',')
+
+head(bioClean1)
+```  
+
+5. How many players are there from each state?  
+
+```{r}
+bioClean2 <- bioClean1 %>% group_by(state) %>% summarize(number_players = n()) %>% arrange(desc(number_players))
+
+table(bioClean2)
+``` 
+35 Players are from Iowa. 10 players are from Florida. 7 players are from Ohio. There is 1 player from Australia which is a country. 
+
+##Part three: Joining data frames
+
+1. Find which states do the ISU defensive and offensive players come from. Create an appropriate summary.  
+
+```{r}
+defHome <- defClean %>% left_join(bioClean1, by = 'Name') %>% select(Name, state) %>% distinct()
+
+
+table(defHome)
+```
+7 defensive players are from Iowa, which looks to be the majority.
+
+```{r}
+offHome <- offClean %>% left_join(bioClean1, by = 'Name') %>% select(Name, state) %>% distinct()
+
+
+table(offHome)
+```  
+There are 2 players from Oklahoma and Florida each and 1 player each for the different states.  
+
+2.How does the performance of quarterback Brock Purdy relate to the performance of the ISU team?  
+
+```{r}
+isuPerf <- offClean %>% group_by(Opponent_Opponent) %>%
+  summarize(rush_yds = sum(Rushing_YDS,na.rm=TRUE),rush_td = sum(Rushing_TD,na.rm=TRUE))
+
+purdyPerf2 <- offClean %>%
+  filter(Name=="Purdy, Brock") %>%
+  select(Opponent_Opponent,Passing_YDS)
+
+teamPerf <- isuPerf %>%
+  left_join(purdyPerf2,by="Opponent_Opponent")
+
+head(teamPerf)
+```  
+
+```{r}
+ggplot(teamPerf, aes(x = Passing_YDS, rush_yds, shape = factor(rush_td))) + geom_point(na.rm=TRUE)
+```  
+
+We can observe Brock Purdys' performance by looking at the passing yards and ISU's performance by looking at rush yards. Brock Purdys' higher passing yards matches ISU's rush yards.
+
+3.Which ISU player(s) made big progress over the last year? Compare the 2019 and the 2018 data here.  
+
+#Load 2018 data
+```{r}
+
+defense18 <- read_excel("cyclonesFootball2018.xlsx", sheet= 'Defensive')
+str(defense18)
+
+offense18 <- read_excel('cyclonesFootball2018.xlsx', sheet= 'Offensive')
+str(offense18)
+
+biography18 <- read_excel('cyclonesFootball2018.xlsx', sheet= 'Biography')
+str(biography18)
+```
+
+#Clean data
+```{r}
+defense18$Name <- as.factor(defense18$Name)
+defense18$Opponent_Opponent <- as.factor(defense18$Opponent_Opponent)
+offense18$Name <- as.factor(offense18$Name)
+offense18$Opponent_Opponent <- as.factor(offense18$Opponent_Opponent)
+biography18$Name <- as.factor(biography18$Name)  
+```
+
+```{r}
+defClean18 <- defense18 %>% mutate_at(c("Tackles_Solo","Tackles_ASST", "Tackles_TFL","Tackles_Sack","Turnover_FF","Turnover_FR","Turnover_INT","Pass_QBH","Pass_PB"),as.numeric)
+
+offClean18 <- offense18 %>% replace_na(list(.=0)) %>% mutate_if(is.character,list(~replace_na(.,0))) %>% mutate_at(c("Rushing_ATT","Rushing_YDS", "Rushing_TD","Receiving_REC","Receiving_YDS","Receiving_TD","Passing_YDS","Receiving_TD","Passing_CMP-ATT","Passing_YDS","Passing_TD","Passing_INT"),as.numeric)
+
+bioClean18 <- biography18 %>% separate(col = Height,into = c("Feet", "Inches"), sep = "-") %>% mutate(Weight = as.numeric(Weight)) %>% mutate(Feet = as.numeric(Feet),Inches = as.numeric(Inches)) %>% mutate(Height = Feet * 12 + Inches) %>% select (-Feet , -Inches)
+
+str(defClean18)
+str(offClean18)
+str(bioClean18)  
+```
+
+#Analyze player progress between 2018 and 2019
+
+```{r}
+defComb <- inner_join(defClean, defClean18, by ='Name') %>% mutate(Diff_Tackles_Solo = Tackles_Solo.x - Tackles_Solo.y) %>% select(Name, Diff_Tackles_Solo) %>% arrange(desc(Diff_Tackles_Solo))
+
+
+defComb
+```
+
+```{r}
+ggplot(defComb, aes(x=Name, y=Diff_Tackles_Solo)) +
+     geom_segment( aes(xend=Name, yend=0)) +
+    geom_point( size=2, color="red") + coord_flip() + xlab("Name")
+
+```  
+
+The two plyers on the defense roster that made improvements were Braxton Lewis and Anthony Johnson. 
+
+```{r}
+offComb <- inner_join(offClean, offClean18, by ='Name') %>% mutate(Diff_Receiving_YDS = Receiving_YDS.x - Receiving_YDS.y) %>% select(Name, Diff_Receiving_YDS) %>% arrange(desc(Diff_Receiving_YDS))
+
+offComb
+```
+```{r}
+ggplot(offComb, aes(x=Name, y=Diff_Receiving_YDS)) +
+geom_segment(aes(xend = Name, yend = 0)) + geom_point( size = 2) + coord_flip() + xlab("Name")
+```
+
+For the offensive roster, Tarique Milton and Deshaunte Jones improved in performance when looking at the difference in receiving yards from 2019 and 2018. Brock Purdy has no change because he is the quarterback and we would have to observe his passing yards.
+
