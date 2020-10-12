@@ -1,7 +1,7 @@
 ---
 title: "Lab 4"
-author: "Muhammad Idris and Cody Nielsen"
-date: "10/8/2020"
+author: "Cody Nielsen"
+date: "10/11/2020"
 output: html_document
 ---
 
@@ -206,4 +206,4 @@ ggplot(offComb, aes(x=Name, y=Diff_Receiving_YDS)) +
 geom_segment(aes(xend = Name, yend = 0)) + geom_point( size = 2) + coord_flip() + xlab("Name")
 ```
 
-For the offensive roster, Tarique Milton and Deshaunte Jones improved in performance when looking at the difference in receiving yards from 2019 and 2018. Brock Purdy has no change because he is the quarterback and we would have to observe his passing yards.  
+For the offensive roster, Tarique Milton and Deshaunte Jones improved in performance when looking at the difference in receiving yards from 2019 and 2018. Brock Purdy has no change because he is the quarterback and we would have to observe his passing yards.
